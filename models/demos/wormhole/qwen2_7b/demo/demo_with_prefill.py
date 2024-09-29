@@ -170,6 +170,8 @@ def run_mistral_demo(user_input, batch_size, device, instruct_mode, is_ci_env, n
     for i in range(num_batches):
         batch_prompts.append([input_prompts[(j + i) % len(input_prompts)] for j in range(len(input_prompts))])
 
+    # FIXME(cthsieh): Uncomment the below.
+    """
     # Load model args, weights, and tokenizer
     model_args = TtModelArgs(device, instruct=instruct_mode)
     tokenizer = Tokenizer(model_args.tokenizer_path)
@@ -241,7 +243,10 @@ def run_mistral_demo(user_input, batch_size, device, instruct_mode, is_ci_env, n
     )
     profiler.end("loading_weights_to_device")
     logger.info("Finished loading weights to device. Starting inference...")
+    """
 
+    # FIXME(cthsieh): Uncomment the below.
+    """
     num_tokens_generated_decode = []
     for batch_idx, input_prompts in enumerate(batch_prompts):
         profiler.start(f"preprocess_prefill_inputs", iteration=batch_idx)
@@ -377,6 +382,7 @@ def run_mistral_demo(user_input, batch_size, device, instruct_mode, is_ci_env, n
             for user in range(batch_size):
                 user_tok = tt_out_tok[user].tolist()
                 if (
+                    # FIXME(cthsieh): What is the EOS token id in Qwen2?
                     user_tok[0] != 28803 and user_done[user] == False
                 ):  # Stop saving the ouput after hitting the EOS token
                     all_outputs[user].append(user_tok[0])
@@ -458,10 +464,13 @@ def run_mistral_demo(user_input, batch_size, device, instruct_mode, is_ci_env, n
         )  # Save the number of tokens generated for each batch (excluding the first token which is used for compile time)
 
         profiler.end("inference_decode", iteration=batch_idx)
+    """
 
     # Finish profiling at the end of all batches
     profiler.end("run")
 
+    # FIXME(cthsieh): Uncomment below.
+    """
     # Benchmark metrics for batch 0
     compile_prefill_time = profiler.get_duration("compile_prefill")
     compile_decode_time = profiler.get_duration("compile_decode")
@@ -545,6 +554,7 @@ def run_mistral_demo(user_input, batch_size, device, instruct_mode, is_ci_env, n
             # config_params=,
             # precision=,
         )
+   """
 
 
 @pytest.mark.parametrize(
