@@ -141,7 +141,7 @@ class TtModelArgs:
                 out_subblock_h=1,  # Must be divisible by per_core_M
                 out_subblock_w=1,  # Must be divisible by per_core_N, out_subblock_w * out_subblock_h <= 4
                 per_core_M=4,  # 32, #16,  # M / TILE_HEIGHT / Grid_Size (dynamic based on seqlen)
-                per_core_N=56,  # N / TILE_WIDTH / Grid_Size
+                per_core_N=74,  # N / TILE_WIDTH / Grid_Size
                 transpose_mcast=False,
                 fused_activation=ttnn.UnaryOpType.SILU,
                 fuse_batch=False,
@@ -153,7 +153,7 @@ class TtModelArgs:
                 out_subblock_h=1,  # Must be divisible by per_core_M
                 out_subblock_w=1,  # Must be divisible by per_core_N, out_subblock_w * out_subblock_h <= 4
                 per_core_M=4,  # M / TILE_HEIGHT / Grid_Size (dynamic based on seqlen)
-                per_core_N=56,  # N / TILE_WIDTH / Grid_Size
+                per_core_N=74,  # N / TILE_WIDTH / Grid_Size
                 transpose_mcast=False,
                 fused_activation=None,
                 fuse_batch=False,
@@ -176,7 +176,7 @@ class TtModelArgs:
                 out_subblock_h=1,  # Must be divisible by per_core_M
                 out_subblock_w=1,  # Must be divisible by per_core_N, out_subblock_w * out_subblock_h <= 4
                 per_core_M=1,  # 32, #16,  # M / TILE_HEIGHT / Grid_Size (dynamic based on seqlen)
-                per_core_N=56,  # N / TILE_WIDTH / Grid_Size
+                per_core_N=74,  # N / TILE_WIDTH / Grid_Size
                 transpose_mcast=False,
                 fused_activation=ttnn.UnaryOpType.SILU,
                 fuse_batch=False,
@@ -188,7 +188,7 @@ class TtModelArgs:
                 out_subblock_h=1,  # Must be divisible by per_core_M
                 out_subblock_w=1,  # Must be divisible by per_core_N, out_subblock_w * out_subblock_h <= 4
                 per_core_M=1,  # M / TILE_HEIGHT / Grid_Size (dynamic based on seqlen)
-                per_core_N=56,  # N / TILE_WIDTH / Grid_Size
+                per_core_N=74,  # N / TILE_WIDTH / Grid_Size
                 transpose_mcast=False,
                 fused_activation=None,
                 fuse_batch=False,
