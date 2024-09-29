@@ -21,7 +21,8 @@ class TtModelArgs:
     n_heads = 28  # "num_attention_heads": 28
     n_kv_heads = 4  # "num_key_value_heads": 4
     norm_eps = 1e-06  # "rms_norm_eps": 1e-06
-    sliding_window = 131072  # "sliding_window": 131072
+    # FIXME(cthsieh): Here we use a smaller number for debugging.
+    sliding_window = 4096  # "sliding_window": 131072
     vocab_size = 152064  # "vocab_size": 152064
 
     # Parameters for our use

@@ -184,7 +184,8 @@ from models.demos.wormhole.qwen2_7b.tt.mistral_attention import TtMistralAttenti
 
 def cache_attention(device, state_dict, model_args, rot_emb_matrix_list, dtype, iterations):
     attention_input = ttnn.from_torch(
-        torch.randn(1, 1, 32, 4096),
+        # FIXME(cthsieh): What is the hard-coded 32 for?
+        torch.randn(1, 1, 32, model_args.dim),
         dtype=ttnn.bfloat16,
         layout=ttnn.TILE_LAYOUT,
         device=device,

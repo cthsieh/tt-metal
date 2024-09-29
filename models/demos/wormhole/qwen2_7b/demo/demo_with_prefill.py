@@ -218,8 +218,6 @@ def run_mistral_demo(user_input, batch_size, device, instruct_mode, is_ci_env, n
     embd = Emb(model_args.vocab_size, model_args.dim, tokenizer.pad_id)
     embd.load_state_dict({"emb.weight": state_dict["model.embed_tokens.weight"]})
 
-    # FIXME(cthsieh): Uncomment the below.
-    """
     max_generated_tokens = 120
     users_decoding = True
 
@@ -244,6 +242,8 @@ def run_mistral_demo(user_input, batch_size, device, instruct_mode, is_ci_env, n
     if instruct_mode:
         tokenizer._model.pad_id = tokenizer._model.eos_id
 
+    # FIXME(cthsieh): Uncomment the below.
+    """
     # Load TTNN mistral model
     logger.info("Loading weights to device...")
     profiler.start("loading_weights_to_device")

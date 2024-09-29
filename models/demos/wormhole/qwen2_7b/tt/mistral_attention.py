@@ -52,13 +52,13 @@ class TtMistralAttention(nn.Module):
 
         self.rot_mat = rot_mat  # Rotational matrix in the form of a list of 8K tensors [1,1,head_dim,head_dim] for positional embedding on device
 
-        layer_name = f"layers.{layer_num}.attention"
+        layer_name = f"model.layers.{layer_num}.self_attn"
         cache_name = lambda name: weight_cache_path / (f"{layer_name}.{name}")
 
-        wq_str = f"{layer_name}.wq.weight"
-        wk_str = f"{layer_name}.wk.weight"
-        wv_str = f"{layer_name}.wv.weight"
-        wo_str = f"{layer_name}.wo.weight"
+        wq_str = f"{layer_name}.q_proj.weight"
+        wk_str = f"{layer_name}.k_proj.weight"
+        wv_str = f"{layer_name}.v_proj.weight"
+        wo_str = f"{layer_name}.o_proj.weight"
 
         # when splitting the devices, we need to make sure that the number of heads is divisible by the number of devices
         assert self.n_heads % self.num_devices == 0
@@ -277,6 +277,7 @@ class TtMistralAttention(nn.Module):
             ###
             # QKV matmuls
             ###
+            # FIXME(cthsieh): Should have bias.
             xqkv_fused = ttnn.linear(
                 x,
                 wqkv,
@@ -367,7 +368,9 @@ class TtMistralAttention(nn.Module):
                 # Reshape such that true unpadded batch is tracked in shape
                 if self.max_batch_size < 32:
                     keys_sliced_T_shape = keys_sliced_T.shape
-                    keys_sliced_T = ttnn.reshape(keys_sliced_T, ttnn.Shape([32, 8, 128, keys_sliced_T_shape[3]]))
+                    keys_sliced_T = ttnn.reshape(
+                        keys_sliced_T, ttnn.Shape([32, self.n_kv_heads, self.head_dim, keys_sliced_T_shape[3]])
+                    )
 
                 attn = ttnn.experimental.group_attn_matmul(
                     q_heads,
@@ -389,7 +392,9 @@ class TtMistralAttention(nn.Module):
                 # Reshape such that true unpadded batch is tracked in shape
                 if self.max_batch_size < 32:
                     values_sliced_shape = values.shape
-                    values = ttnn.reshape(values, ttnn.Shape([32, 8, values_sliced_shape[2], 128]))
+                    values = ttnn.reshape(
+                        values, ttnn.Shape([32, self.n_kv_heads, values_sliced_shape[2], self.head_dim])
+                    )
                 values_sliced = values[:, :, :layer_slice, :]
                 attn_output = ttnn.experimental.group_attn_matmul(
                     attn_sliced,
