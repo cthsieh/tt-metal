@@ -179,7 +179,7 @@ def sample(logits: torch.Tensor, temperature: float, top_p: float):
     return next_token
 
 
-from models.demos.wormhole.mistral7b.tt.mistral_attention import TtMistralAttention
+from models.demos.wormhole.qwen2_7b.tt.mistral_attention import TtMistralAttention
 
 
 def cache_attention(device, state_dict, model_args, rot_emb_matrix_list, dtype, iterations):

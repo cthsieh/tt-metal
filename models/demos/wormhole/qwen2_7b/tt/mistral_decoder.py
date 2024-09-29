@@ -4,8 +4,8 @@
 import torch
 import ttnn
 from typing import Optional
-from models.demos.wormhole.mistral7b.tt.mistral_attention import TtMistralAttention
-from models.demos.wormhole.mistral7b.tt.mistral_mlp import TtMistralMLP
+from models.demos.wormhole.qwen2_7b.tt.mistral_attention import TtMistralAttention
+from models.demos.wormhole.qwen2_7b.tt.mistral_mlp import TtMistralMLP
 from models.common.rmsnorm import RMSNorm
 
 

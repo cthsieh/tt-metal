@@ -5,7 +5,7 @@
 import ttnn
 import torch
 import torch.nn as nn
-from models.demos.wormhole.mistral7b.tt.mistral_decoder import TtTransformerBlock
+from models.demos.wormhole.qwen2_7b.tt.mistral_decoder import TtTransformerBlock
 from models.common.rmsnorm import RMSNorm
 import ttnn
 from typing import Optional

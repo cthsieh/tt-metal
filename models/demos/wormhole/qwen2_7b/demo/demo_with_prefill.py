@@ -10,7 +10,7 @@ from loguru import logger
 import os
 import ttnn
 import pytest
-from models.demos.wormhole.mistral7b.tt.mistral_common import (
+from models.demos.wormhole.qwen2_7b.tt.mistral_common import (
     prepare_inputs_ttnn,
     sample,
     precompute_freqs,
@@ -20,9 +20,9 @@ from models.demos.wormhole.mistral7b.tt.mistral_common import (
     prepare_inputs_ttnn_prefill,
     get_rot_transformation_mat,
 )
-from models.demos.wormhole.mistral7b.tt.mistral_model import TtTransformer
-from models.demos.wormhole.mistral7b.tt.mistral_embedding import TtMistralEmbedding
-from models.demos.wormhole.mistral7b.reference.tokenizer import Tokenizer
+from models.demos.wormhole.qwen2_7b.tt.mistral_model import TtTransformer
+from models.demos.wormhole.qwen2_7b.tt.mistral_embedding import TtMistralEmbedding
+from models.demos.wormhole.qwen2_7b.reference.tokenizer import Tokenizer
 
 from models.perf.benchmarking_utils import BenchmarkProfiler
 from models.demos.utils.llm_demo_utils import create_benchmark_data, verify_perf
@@ -133,7 +133,7 @@ def preprocess_inputs_prefill(input_prompts, tokenizer, model_args, dtype, embd,
 def run_mistral_demo(user_input, batch_size, device, instruct_mode, is_ci_env, num_batches, print_to_file, is_n300):
     # Create batch output file
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    output_directory = "models/demos/wormhole/mistral7b/demo/output"
+    output_directory = "models/demos/wormhole/qwen2_7b/demo/output"
     os.makedirs(output_directory, exist_ok=True)
     os.chmod(output_directory, 0o755)
     output_filename = f"{output_directory}/demo_user_output_{timestamp}.txt"
@@ -144,7 +144,7 @@ def run_mistral_demo(user_input, batch_size, device, instruct_mode, is_ci_env, n
         os.environ["MISTRAL_TOKENIZER_PATH"] = "/mnt/MLPerf/tt_dnn-models/Mistral/mistral-7B-v0.1/instruct/"
         os.environ["MISTRAL_CACHE_PATH"] = "/mnt/MLPerf/tt_dnn-models/Mistral/mistral-7B-v0.1/instruct/"
     # This module requires the env paths above for CI runs
-    from models.demos.wormhole.mistral7b.tt.model_config import TtModelArgs
+    from models.demos.wormhole.qwen2_7b.tt.model_config import TtModelArgs
 
     embed_on_device = False
     dtype = ttnn.bfloat8_b
@@ -536,7 +536,7 @@ def run_mistral_demo(user_input, batch_size, device, instruct_mode, is_ci_env, n
         benchmark_data.prep_csvs(
             profiler,
             run_type=f"demo_with_prefill",
-            ml_model_name="Mistral7B",
+            ml_model_name="Qwen2-7B",
             ml_model_type="llm",
             num_layers=model_args.n_layers,
             batch_size=batch_size,
@@ -551,7 +551,7 @@ def run_mistral_demo(user_input, batch_size, device, instruct_mode, is_ci_env, n
     "input_prompts, instruct_weights, num_batches",
     [
         # Combinations for general weights
-        ("models/demos/wormhole/mistral7b/demo/input_data_prefill_128.json", False, 1),
+        ("models/demos/wormhole/qwen2_7b/demo/input_data_prefill_128.json", False, 1),
         #        ("models/demos/wormhole/mistral7b/demo/input_data_prefill_128.json", False, 2),
         #        ("models/demos/wormhole/mistral7b/demo/input_data_prefill_128.json", False, 3),
         #        ("models/demos/wormhole/mistral7b/demo/input_data_prefill_128.json", False, 4),
