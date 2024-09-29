@@ -24,6 +24,7 @@ class RMSNorm(LightweightModule):
         dim: Input dimension (e.g. model hidden dimension size).
         layer_num: The layer number to determine the weight key in the state dictionary.
         weight_key: The key for retrieving the weight from the state dictionary.
+        weight_name: The "full" key name for retrieving the weight from the state dictionary.
         weight_cache_path: Optional path for caching the tilized weights.
         weight_memory_config: Configuration for the weight memory, default is DRAM_MEMORY_CONFIG.
         weight_dtype: The data type for the tensors, bfp8_b hits >0.999 PCC in the models we tested.
@@ -39,7 +40,9 @@ class RMSNorm(LightweightModule):
         device,
         dim,
         state_dict,
+        # FIXME(cthsieh): Should remove `weight_key` since its function is replaced with `weight_name`.
         weight_key,
+        weight_name=None,
         layer_num=None,
         weight_cache_path=None,
         weight_memory_config=ttnn.DRAM_MEMORY_CONFIG,
@@ -50,10 +53,11 @@ class RMSNorm(LightweightModule):
         super().__init__()
         self.eps = eps
 
-        if layer_num is None:
-            weight_name = f"{weight_key}.weight"
-        else:
-            weight_name = f"layers.{layer_num}.{weight_key}.weight"
+        if weight_name is None:
+            if layer_num is None:
+                weight_name = f"{weight_key}.weight"
+            else:
+                weight_name = f"layers.{layer_num}.{weight_key}.weight"
 
         torch_weight = state_dict[weight_name].unsqueeze(0).view(1, 1, dim).expand([1, SHARD_HEIGHT, dim])
         cache_name = None if weight_cache_path is None else weight_cache_path / weight_name

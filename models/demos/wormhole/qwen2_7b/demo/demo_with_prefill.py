@@ -242,8 +242,6 @@ def run_mistral_demo(user_input, batch_size, device, instruct_mode, is_ci_env, n
     if instruct_mode:
         tokenizer._model.pad_id = tokenizer._model.eos_id
 
-    # FIXME(cthsieh): Uncomment the below.
-    """
     # Load TTNN mistral model
     logger.info("Loading weights to device...")
     profiler.start("loading_weights_to_device")
@@ -257,16 +255,16 @@ def run_mistral_demo(user_input, batch_size, device, instruct_mode, is_ci_env, n
         rot_mat=rot_emb_matrix_list,
         start_pos=generation_start_pos,
     )
-    tt_embd = TtMistralEmbedding(
-        device=device,
-        args=model_args,
-        weight_cache_path=model_args.weight_cache_path(dtype),
-        state_dict=state_dict,
-        dtype=ttnn.bfloat16,  # Row major layout requires bfloat16
-    )
+    if embed_on_device:
+        tt_embd = TtMistralEmbedding(
+            device=device,
+            args=model_args,
+            weight_cache_path=model_args.weight_cache_path(dtype),
+            state_dict=state_dict,
+            dtype=ttnn.bfloat16,  # Row major layout requires bfloat16
+        )
     profiler.end("loading_weights_to_device")
     logger.info("Finished loading weights to device. Starting inference...")
-    """
 
     # FIXME(cthsieh): Uncomment the below.
     """
