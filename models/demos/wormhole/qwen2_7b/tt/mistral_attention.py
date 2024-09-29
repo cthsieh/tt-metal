@@ -60,11 +60,16 @@ class TtMistralAttention(nn.Module):
         wv_str = f"{layer_name}.v_proj.weight"
         wo_str = f"{layer_name}.o_proj.weight"
 
+        bias_q_str = f"{layer_name}.q_proj.bias"
+        bias_k_str = f"{layer_name}.k_proj.bias"
+        bias_v_str = f"{layer_name}.v_proj.bias"
+
         # when splitting the devices, we need to make sure that the number of heads is divisible by the number of devices
         assert self.n_heads % self.num_devices == 0
         assert self.n_kv_heads % self.num_devices == 0
 
         self.wqkv_list = []
+        self.bias_qkv_list = []
         self.wo_list = []
         self.layer_past_list = []
 
@@ -95,6 +100,22 @@ class TtMistralAttention(nn.Module):
                 memory_config=self.model_config["ATTN_WEIGHTS_MEMCFG"],
                 layout=self.model_config["ATTN_W_LAYOUT_TILE"],
                 cache_file_name=cache_name("wqkv"),
+            )
+
+            bias_qkv = ttnn.as_tensor(
+                torch.concat(
+                    [
+                        torch.chunk(self.state_dict[bias_q_str], self.num_devices)[i],
+                        torch.chunk(self.state_dict[bias_k_str], self.num_devices)[i],
+                        torch.chunk(self.state_dict[bias_v_str], self.num_devices)[i],
+                    ],
+                    dim=-1,
+                ),
+                device=self.devices[i],
+                dtype=ttnn.bfloat16,
+                memory_config=self.model_config["ATTN_BIAS_WEIGHTS_MEMCFG"],
+                layout=self.model_config["ATTN_B_LAYOUT_TILE"],
+                cache_file_name=cache_name("bias_qkv"),
             )
 
             wo = ttnn.as_tensor(
@@ -136,6 +157,7 @@ class TtMistralAttention(nn.Module):
 
             # add to the list
             self.wqkv_list.append(wqkv)
+            self.bias_qkv_list.append(bias_qkv)
             self.wo_list.append(wo)
             self.layer_past_list.append(layer_past)
 
@@ -267,6 +289,7 @@ class TtMistralAttention(nn.Module):
                 attn_mask = None
             device = self.devices[i]
             wqkv = self.wqkv_list[i]
+            bias_qkv = self.bias_qkv_list[i]
             wo = self.wo_list[i]
             layer_past = self.layer_past_list[i]
             head_dim = self.head_dims[i]
@@ -281,6 +304,7 @@ class TtMistralAttention(nn.Module):
             xqkv_fused = ttnn.linear(
                 x,
                 wqkv,
+                bias=bias_qkv,
                 memory_config=self.model_config["XQKV_MM_OUTPUT_MEMCFG"],
                 compute_kernel_config=self.compute_kernel_config,
                 dtype=self.dtype,
@@ -525,6 +549,7 @@ class TtMistralAttention(nn.Module):
         seq_len = xs_11SH.shape[-2]
         assert seq_len % 128 == 0 and seq_len > 0, "Seqlen must be divisible by 128"
         wqkv = self.wqkv_list[0]
+        bias_qkv = self.bias_qkv_list[0]
         wo = self.wo_list[0]
         self.layer_past = self.layer_past_list[0]
         ###
@@ -537,6 +562,7 @@ class TtMistralAttention(nn.Module):
         xqkv_fused = ttnn.linear(
             xs_11SH,
             wqkv,
+            bias=bias_qkv,
             dtype=ttnn.bfloat16,
             memory_config=ttnn.DRAM_MEMORY_CONFIG,
             compute_kernel_config=self.compute_kernel_config,

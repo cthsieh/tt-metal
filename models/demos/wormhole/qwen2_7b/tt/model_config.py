@@ -46,6 +46,7 @@ class TtModelArgs:
         "MLP_W_LAYOUT",
         # Attention
         "ATTN_WEIGHTS",
+        "ATTN_BIAS_WEIGHTS",  # Mark bias with `WEIGHTS` so that it is handled like "typical" weights, like being stored in DRAM.
         "XQKV_MM_OUTPUT",
         "QKV_HEADS_OUTPUT",
         "QV_ROT_EMB_OUTPUT",
@@ -55,6 +56,7 @@ class TtModelArgs:
         "CONCAT_HEADS_OUTPUT",
         "LM_HEAD_OUTPUT",
         "ATTN_W_LAYOUT",
+        "ATTN_B_LAYOUT",
         # Decoder
         "DEC_SKIP_OUTPUT",
     )
