@@ -32,9 +32,9 @@ import pdb
 
 
 class Emb(torch.nn.Module):
-    def __init__(self):
+    def __init__(self, vocab_size, hidden_size, pad_id):
         super().__init__()
-        self.emb = torch.nn.Embedding(32000, 4096)
+        self.emb = torch.nn.Embedding(vocab_size, hidden_size, pad_id)
 
     def forward(self, x):
         return self.emb(x)
@@ -214,12 +214,12 @@ def run_mistral_demo(user_input, batch_size, device, instruct_mode, is_ci_env, n
     profiler.end("weight_loading")
     logger.info("Loading weights finished!")
 
+    # TODO Should we keep initial embedding on host?
+    embd = Emb(model_args.vocab_size, model_args.dim, tokenizer.pad_id)
+    embd.load_state_dict({"emb.weight": state_dict["model.embed_tokens.weight"]})
+
     # FIXME(cthsieh): Uncomment the below.
     """
-    # TODO Should we keep initial embedding on host?
-    embd = Emb()
-    embd.load_state_dict({"emb.weight": state_dict["tok_embeddings.weight"]})
-
     max_generated_tokens = 120
     users_decoding = True
 
