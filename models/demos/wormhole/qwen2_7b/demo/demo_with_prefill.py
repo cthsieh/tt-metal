@@ -132,6 +132,28 @@ def preprocess_inputs_prefill(input_prompts, tokenizer, model_args, dtype, embd,
     )
 
 
+def load_weights(weights_path):
+    from safetensors.torch import load_file
+
+    # Read the index file which contains the file names of the weight files.
+    index_path = weights_path + "/model.safetensors.index.json"
+    with open(index_path, "r") as f:
+        index_data = json.load(f)
+
+    # Retrieve the weight file names from the index JSON
+    weight_map = index_data["weight_map"]
+    safetensor_files = set(weight_map.values())
+
+    # Read each safetensors file mentioned in the index
+    loaded_weights = {}
+    for file in safetensor_files:
+        safetensor_path = weights_path + "/" + file
+        weights = load_file(safetensor_path)
+        loaded_weights.update(weights)  # Merge weights into a single dictionary
+
+    return loaded_weights
+
+
 def run_mistral_demo(user_input, batch_size, device, instruct_mode, is_ci_env, num_batches, print_to_file, is_n300):
     # Create batch output file
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -176,22 +198,24 @@ def run_mistral_demo(user_input, batch_size, device, instruct_mode, is_ci_env, n
     model_args = TtModelArgs(device, instruct=instruct_mode)
     tokenizer = Tokenizer(model_args.tokenizer_path)
 
-    # FIXME(cthsieh): Uncomment the below.
-    """
+    model_args.n_layers = 28
+
     logger.info("Loading weights...")
     profiler.start("weight_loading")
-    state_dict = torch.load(model_args.consolidated_weights_path)
+    state_dict = load_weights(model_args.consolidated_weights_path)
     state_dict = {
         k: v
         for k, v in state_dict.items()
         if (
             any([f"layers.{i}." in k for i in range(model_args.n_layers)])
-            or k in ["tok_embeddings.weight", "norm.weight", "output.weight"]
+            or k in ["model.embed_tokens.weight", "model.norm.weight", "lm_head.weight"]
         )
     }
     profiler.end("weight_loading")
     logger.info("Loading weights finished!")
 
+    # FIXME(cthsieh): Uncomment the below.
+    """
     # TODO Should we keep initial embedding on host?
     embd = Emb()
     embd.load_state_dict({"emb.weight": state_dict["tok_embeddings.weight"]})
