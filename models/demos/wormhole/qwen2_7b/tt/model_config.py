@@ -14,15 +14,15 @@ import urllib.request
 class TtModelArgs:
     """Model args for Mistral 7B as provided by the params.json config file"""
 
-    dim = 4096
-    n_layers = 32
-    head_dim = 128
-    hidden_dim = 14336
-    n_heads = 32
-    n_kv_heads = 8
-    norm_eps = 1e-05
-    sliding_window = 4096
-    vocab_size = 32000
+    dim = 3584  # "hidden_size": 3584
+    n_layers = 28  # "num_hidden_layers": 28
+    head_dim = 128  # "hidden_size" / "num_attention_heads": 3584 / 28 = 128
+    hidden_dim = 18944  # "intermediate_size": 18944
+    n_heads = 28  # "num_attention_heads": 28
+    n_kv_heads = 4  # "num_key_value_heads": 4
+    norm_eps = 1e-06  # "rms_norm_eps": 1e-06
+    sliding_window = 131072  # "sliding_window": 131072
+    vocab_size = 152064  # "vocab_size": 152064
 
     # Parameters for our use
     max_batch_size = 8
@@ -30,9 +30,9 @@ class TtModelArgs:
     kv_seq_len = 4096
 
     # Default folder location for weights and cached files
-    DEFAULT_CKPT_DIR = os.getenv("MISTRAL_CKPT_DIR", "/mnt/MLPerf/tt_dnn-models/Mistral/mistral-7B-v0.1/")
-    DEFAULT_TOKENIZER_PATH = os.getenv("MISTRAL_TOKENIZER_PATH", "/mnt/MLPerf/tt_dnn-models/Mistral/mistral-7B-v0.1/")
-    DEFAULT_CACHE_PATH = os.getenv("MISTRAL_CACHE_PATH", "/mnt/MLPerf/tt_dnn-models/Mistral/mistral-7B-v0.1/")
+    DEFAULT_CKPT_DIR = os.getenv("QWEN2_CKPT_DIR", "/mnt/MLPerf/tt_dnn-models/Mistral/mistral-7B-v0.1/")
+    DEFAULT_TOKENIZER_PATH = os.getenv("QWEN2_TOKENIZER_PATH", "/mnt/MLPerf/tt_dnn-models/Mistral/mistral-7B-v0.1/")
+    DEFAULT_CACHE_PATH = os.getenv("QWEN2_CACHE_PATH", "/mnt/MLPerf/tt_dnn-models/Mistral/mistral-7B-v0.1/")
 
     OP_KEYS = (
         # Embedding
@@ -64,18 +64,19 @@ class TtModelArgs:
             self.DEFAULT_CKPT_DIR
         ), f"Checkpoint directory {self.DEFAULT_CKPT_DIR} does not exist, please use export MISTRAL_CKPT_DIR=..."
         assert os.path.isfile(
-            self.DEFAULT_TOKENIZER_PATH + "/tokenizer.model"
-        ), f"Tokenizer file {self.DEFAULT_TOKENIZER_PATH + '/tokenizer.model'} does not exist, please use export MISTRAL_TOKENIZER_PATH=..."
+            self.DEFAULT_TOKENIZER_PATH + "/tokenizer.json"
+        ), f"Tokenizer file {self.DEFAULT_TOKENIZER_PATH + '/tokenizer.json'} does not exist, please use export QWEN2_TOKENIZER_PATH=..."
         assert os.path.exists(
             self.DEFAULT_CACHE_PATH
         ), f"Cache directory {self.DEFAULT_CACHE_PATH} does not exist, please use export MISTRAL_CACHE_PATH=..."
         # Check if weights exist in the specified folder. If not warn the user to run the download and untar script.
-        assert os.path.isfile(
-            self.DEFAULT_CKPT_DIR + "/consolidated.00.pth"
-        ), f"weights consolidated.00.pth file does not exist. Please use the script `models/demos/wormhole/mistral7b/scripts/get_weights.py` to download and untar the weights."
+        for i in range(1, 5):
+            assert os.path.isfile(
+                self.DEFAULT_CKPT_DIR + f"/model-{str(i).zfill(5)}-of-00004.safetensors"
+            ), f"weights model-{str(i).zfill(5)}-of-00004.safetensors file does not exist. Please use the script `models/demos/wormhole/qwen2_7b/scripts/get_weights.py` to download and untar the weights."
 
         logger.info(f"Checkpoint directory: {self.DEFAULT_CKPT_DIR}")
-        logger.info(f"Tokenizer file: {self.DEFAULT_TOKENIZER_PATH + '/tokenizer.model'}")
+        logger.info(f"Tokenizer file: {self.DEFAULT_TOKENIZER_PATH + '/tokenizer.json'}")
         logger.info(f"Cache directory: {self.DEFAULT_CACHE_PATH}")
 
         # Some consumers like SentencePiece only accept str not Path for files
@@ -83,8 +84,8 @@ class TtModelArgs:
         self.model_cache_path = Path(self.DEFAULT_CACHE_PATH)
 
         # Load weights and tokenizer
-        self.consolidated_weights_path = self.DEFAULT_CKPT_DIR + "/consolidated.00.pth"
-        self.tokenizer_path = self.DEFAULT_TOKENIZER_PATH + "/tokenizer.model"
+        self.consolidated_weights_path = self.DEFAULT_CKPT_DIR
+        self.tokenizer_path = self.DEFAULT_TOKENIZER_PATH
 
         self.instruct = instruct
 

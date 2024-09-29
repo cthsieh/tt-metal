@@ -26,6 +26,8 @@ from models.demos.wormhole.qwen2_7b.reference.tokenizer import Tokenizer
 
 from models.perf.benchmarking_utils import BenchmarkProfiler
 from models.demos.utils.llm_demo_utils import create_benchmark_data, verify_perf
+
+# FIXME(cthsieh): Should be removed after debugging.
 import pdb
 
 
@@ -170,15 +172,12 @@ def run_mistral_demo(user_input, batch_size, device, instruct_mode, is_ci_env, n
     for i in range(num_batches):
         batch_prompts.append([input_prompts[(j + i) % len(input_prompts)] for j in range(len(input_prompts))])
 
-    # FIXME(cthsieh): Uncomment the below.
-    """
     # Load model args, weights, and tokenizer
     model_args = TtModelArgs(device, instruct=instruct_mode)
     tokenizer = Tokenizer(model_args.tokenizer_path)
 
-    model_args.n_layers = 32
-
-    # pdb.set_trace()
+    # FIXME(cthsieh): Uncomment the below.
+    """
     logger.info("Loading weights...")
     profiler.start("weight_loading")
     state_dict = torch.load(model_args.consolidated_weights_path)
