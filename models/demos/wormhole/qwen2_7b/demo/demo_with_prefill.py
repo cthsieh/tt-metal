@@ -349,8 +349,6 @@ def run_mistral_demo(user_input, batch_size, device, instruct_mode, is_ci_env, n
 
         profiler.start("inference_decode", iteration=batch_idx)
 
-        # FIXME(cthsieh)
-        """
         # Keep running inference as long as there is a user in the batch still decoding or max tokens per user are decoded
         while users_decoding:
             if iteration == 0:  # First iteration also accounts for compile time
@@ -404,7 +402,8 @@ def run_mistral_demo(user_input, batch_size, device, instruct_mode, is_ci_env, n
                 user_tok = tt_out_tok[user].tolist()
                 if (
                     # FIXME(cthsieh): What is the EOS token id in Qwen2?
-                    user_tok[0] != tokenizer.eos_id and user_done[user] == False
+                    user_tok[0] != tokenizer.eos_id
+                    and user_done[user] == False
                 ):  # Stop saving the ouput after hitting the EOS token
                     all_outputs[user].append(user_tok[0])
                 else:
@@ -483,7 +482,6 @@ def run_mistral_demo(user_input, batch_size, device, instruct_mode, is_ci_env, n
         num_tokens_generated_decode.append(
             iteration - 1
         )  # Save the number of tokens generated for each batch (excluding the first token which is used for compile time)
-        """
 
         profiler.end("inference_decode", iteration=batch_idx)
 
