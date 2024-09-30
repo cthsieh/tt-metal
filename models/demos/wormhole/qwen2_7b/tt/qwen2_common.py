@@ -179,18 +179,19 @@ def sample(logits: torch.Tensor, temperature: float, top_p: float):
     return next_token
 
 
-from models.demos.wormhole.qwen2_7b.tt.qwen2_attention import TtMistralAttention
+from models.demos.wormhole.qwen2_7b.tt.qwen2_attention import TtQwen2Attention
 
 
 def cache_attention(device, state_dict, model_args, rot_emb_matrix_list, dtype, iterations):
     attention_input = ttnn.from_torch(
-        torch.randn(1, 1, 32, 4096),
+        # FIXME(cthsieh): What is the hard-coded 32 for?
+        torch.randn(1, 1, 32, model_args.dim),
         dtype=ttnn.bfloat16,
         layout=ttnn.TILE_LAYOUT,
         device=device,
         memory_config=ttnn.L1_MEMORY_CONFIG,
     )
-    tt_model = TtMistralAttention(
+    tt_model = TtQwen2Attention(
         [device],
         state_dict,
         weight_cache_path=model_args.weight_cache_path(dtype),
