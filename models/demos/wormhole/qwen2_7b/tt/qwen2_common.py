@@ -5,6 +5,8 @@
 import torch
 import ttnn
 from models.utility_functions import nearest_32
+from safetensors.torch import load_file as safetensors_load_file
+import json
 
 
 def generate_cos_sin_cache_ttnn(
@@ -52,18 +54,20 @@ def generate_cos_sin_cache_ttnn(
     return tt_cos_cached, tt_sin_cached
 
 
-def precompute_freqs(dim: int, end: int, theta: float = 10000.0):
+def precompute_freqs(dim: int, end: int, theta: float = 1000000.0):
     """
     Precompute the frequency tensor for sine and cosine values with given dimensions.
 
     Args:
         dim (int): Dimension of the frequency tensor.
         end (int): End index for precomputing frequencies.
-        theta (float, optional): Scaling factor for frequency computation. Defaults to 10000.0.
+        theta (float, optional): Scaling factor for frequency computation. Defaults to 1000000.0.
 
     Returns:
         Tuple[torch.Tensor, torch.Tensor]: Tensors containing cosine and sine values.
     """
+    # The default theta is sourced from the official config file: https://huggingface.co/Qwen/Qwen2-7B/blob/main/config.json, where `rope_theta` is referred.
+
     freqs = 1.0 / (theta ** (torch.arange(0, dim, 2)[: (dim // 2)].float() / dim))
 
     t = torch.arange(end)
@@ -184,7 +188,6 @@ from models.demos.wormhole.qwen2_7b.tt.qwen2_attention import TtQwen2Attention
 
 def cache_attention(device, state_dict, model_args, rot_emb_matrix_list, dtype, iterations):
     attention_input = ttnn.from_torch(
-        # FIXME(cthsieh): What is the hard-coded 32 for?
         torch.randn(1, 1, 32, model_args.dim),
         dtype=ttnn.bfloat16,
         layout=ttnn.TILE_LAYOUT,
@@ -296,3 +299,23 @@ def prepare_inputs_ttnn_prefill(x_bsh, device):
         memory_config=ttnn.DRAM_MEMORY_CONFIG,
     )
     return xs_1BSH, attn_mask, attn_mask_torch
+
+
+def load_safetensor_weights(weights_path):
+    # Read the index file which contains the file names of the weight files.
+    index_path = weights_path + "/model.safetensors.index.json"
+    with open(index_path, "r") as f:
+        index_data = json.load(f)
+
+    # Retrieve the weight file names from the index JSON
+    weight_map = index_data["weight_map"]
+    safetensor_files = set(weight_map.values())
+
+    # Read each safetensors file mentioned in the index
+    loaded_weights = {}
+    for file in safetensor_files:
+        safetensor_path = weights_path + "/" + file
+        weights = safetensors_load_file(safetensor_path)
+        loaded_weights.update(weights)  # Merge weights into a single dictionary
+
+    return loaded_weights

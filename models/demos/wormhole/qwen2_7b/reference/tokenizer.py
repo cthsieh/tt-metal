@@ -28,8 +28,7 @@ from typing import List
 import torch
 from torch import nn
 
-# FIXME(cthsieh)
-# from models.demos.wormhole.qwen2_7b.reference.model import Transformer
+from models.demos.wormhole.qwen2_7b.reference.model import Transformer
 
 
 class Tokenizer:
@@ -65,8 +64,6 @@ class Tokenizer:
         return self._model.decode(t)
 
 
-# FIXME(cthsieh): Uncomment this.
-"""
 def generate(prompts: List[str], model: Transformer, tokenizer: Tokenizer, max_tokens: int):
     encoded_prompts = [tokenizer.encode(prompt) for prompt in prompts]
     prompt_lens = [len(x) for x in encoded_prompts]
@@ -106,4 +103,3 @@ def generate(prompts: List[str], model: Transformer, tokenizer: Tokenizer, max_t
         for i, x in enumerate(encoded_prompts):
             res.append(tokenizer.decode(x[:min_prompt_len] + generated[i].tolist()))
     return res, all_logprobs
-"""

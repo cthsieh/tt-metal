@@ -19,25 +19,15 @@ from models.demos.wormhole.qwen2_7b.tt.qwen2_common import (
     get_prefill_rot_mat,
     prepare_inputs_ttnn_prefill,
     get_rot_transformation_mat,
+    load_safetensor_weights,
 )
 from models.demos.wormhole.qwen2_7b.tt.qwen2_model import TtTransformer
 from models.demos.wormhole.qwen2_7b.tt.qwen2_embedding import TtQwen2Embedding
 from models.demos.wormhole.qwen2_7b.reference.tokenizer import Tokenizer
+from models.demos.wormhole.qwen2_7b.reference.model import Emb
 
 from models.perf.benchmarking_utils import BenchmarkProfiler
 from models.demos.utils.llm_demo_utils import create_benchmark_data, verify_perf
-
-# FIXME(cthsieh): Should be removed after debugging.
-import pdb
-
-
-class Emb(torch.nn.Module):
-    def __init__(self, vocab_size, hidden_size, pad_id):
-        super().__init__()
-        self.emb = torch.nn.Embedding(vocab_size, hidden_size, pad_id)
-
-    def forward(self, x):
-        return self.emb(x)
 
 
 # load from json, return as a list
@@ -101,11 +91,12 @@ def preprocess_inputs_prefill(input_prompts, tokenizer, model_args, dtype, embd,
 
     # Select the first token from the prompts for initial decoding
     pt_tokenized_inputs_decode = torch.tensor(input_tokens_decode)
-    # FIXME(cthsieh): Should not assume `batch_size` = 1. `view(1, ...)` -> `view(batch_size, ...)`.
-    emb_inputs_decode = embd(pt_tokenized_inputs_decode[:, 0]).view(1, 1, -1)
+    emb_inputs_decode = embd(pt_tokenized_inputs_decode[:, 0]).view(pt_tokenized_inputs_decode.shape[0], 1, -1)
     if prefill_seq_len > 0:
-        # FIXME(cthsieh): Should not assume `batch_size` = 1. `for b in range(1)` -> `for b in range(batch_size)`.
-        emb_prefill_inputs = [embd(pt_tokenized_inputs_prefill[b, :]).view(1, prefill_seq_len, -1) for b in range(1)]
+        emb_prefill_inputs = [
+            embd(pt_tokenized_inputs_prefill[b, :]).view(1, prefill_seq_len, -1)
+            for b in range(pt_tokenized_inputs_prefill.shape[0])
+        ]
     else:
         emb_prefill_inputs = None
 
@@ -130,28 +121,6 @@ def preprocess_inputs_prefill(input_prompts, tokenizer, model_args, dtype, embd,
         prefill_seq_len,
         encoded_prompts,
     )
-
-
-def load_weights(weights_path):
-    from safetensors.torch import load_file
-
-    # Read the index file which contains the file names of the weight files.
-    index_path = weights_path + "/model.safetensors.index.json"
-    with open(index_path, "r") as f:
-        index_data = json.load(f)
-
-    # Retrieve the weight file names from the index JSON
-    weight_map = index_data["weight_map"]
-    safetensor_files = set(weight_map.values())
-
-    # Read each safetensors file mentioned in the index
-    loaded_weights = {}
-    for file in safetensor_files:
-        safetensor_path = weights_path + "/" + file
-        weights = load_file(safetensor_path)
-        loaded_weights.update(weights)  # Merge weights into a single dictionary
-
-    return loaded_weights
 
 
 def run_qwen2_demo(user_input, batch_size, device, instruct_mode, is_ci_env, num_batches, print_to_file, is_n300):
@@ -202,7 +171,7 @@ def run_qwen2_demo(user_input, batch_size, device, instruct_mode, is_ci_env, num
 
     logger.info("Loading weights...")
     profiler.start("weight_loading")
-    state_dict = load_weights(model_args.consolidated_weights_path)
+    state_dict = load_safetensor_weights(model_args.consolidated_weights_path)
     state_dict = {
         k: v
         for k, v in state_dict.items()
@@ -401,9 +370,7 @@ def run_qwen2_demo(user_input, batch_size, device, instruct_mode, is_ci_env, num
             for user in range(batch_size):
                 user_tok = tt_out_tok[user].tolist()
                 if (
-                    # FIXME(cthsieh): What is the EOS token id in Qwen2?
-                    user_tok[0] != tokenizer.eos_id
-                    and user_done[user] == False
+                    user_tok[0] != tokenizer.eos_id and user_done[user] == False
                 ):  # Stop saving the ouput after hitting the EOS token
                     all_outputs[user].append(user_tok[0])
                 else:
@@ -488,8 +455,6 @@ def run_qwen2_demo(user_input, batch_size, device, instruct_mode, is_ci_env, num
     # Finish profiling at the end of all batches
     profiler.end("run")
 
-    # FIXME(cthsieh): Uncomment below.
-    """
     # Benchmark metrics for batch 0
     compile_prefill_time = profiler.get_duration("compile_prefill")
     compile_decode_time = profiler.get_duration("compile_decode")
@@ -573,7 +538,6 @@ def run_qwen2_demo(user_input, batch_size, device, instruct_mode, is_ci_env, num
             # config_params=,
             # precision=,
         )
-   """
 
 
 @pytest.mark.parametrize(
@@ -581,28 +545,30 @@ def run_qwen2_demo(user_input, batch_size, device, instruct_mode, is_ci_env, num
     [
         # Combinations for general weights
         ("models/demos/wormhole/qwen2_7b/demo/input_data_prefill_128.json", False, 1),
-        #        ("models/demos/wormhole/qwen2_7b/demo/input_data_prefill_128.json", False, 2),
-        #        ("models/demos/wormhole/qwen2_7b/demo/input_data_prefill_128.json", False, 3),
-        #        ("models/demos/wormhole/qwen2_7b/demo/input_data_prefill_128.json", False, 4),
-        #        ("models/demos/wormhole/qwen2_7b/demo/input_data_prefill_128.json", False, 5),
+        # FIXME(cthsieh): Will enable when ready.
+        # ("models/demos/wormhole/qwen2_7b/demo/input_data_prefill_128.json", False, 2),
+        # ("models/demos/wormhole/qwen2_7b/demo/input_data_prefill_128.json", False, 3),
+        # ("models/demos/wormhole/qwen2_7b/demo/input_data_prefill_128.json", False, 4),
+        # ("models/demos/wormhole/qwen2_7b/demo/input_data_prefill_128.json", False, 5),
         # Combinations for instruct weights
-        #        ("models/demos/wormhole/qwen2_7b/demo/input_data_questions_prefill_128.json", True, 1),
-        #        ("models/demos/wormhole/qwen2_7b/demo/input_data_questions_prefill_128.json", True, 2),
-        #        ("models/demos/wormhole/qwen2_7b/demo/input_data_questions_prefill_128.json", True, 3),
-        #        ("models/demos/wormhole/qwen2_7b/demo/input_data_questions_prefill_128.json", True, 4),
-        #        ("models/demos/wormhole/qwen2_7b/demo/input_data_questions_prefill_128.json", True, 5),
+        # ("models/demos/wormhole/qwen2_7b/demo/input_data_questions_prefill_128.json", True, 1),
+        # ("models/demos/wormhole/qwen2_7b/demo/input_data_questions_prefill_128.json", True, 2),
+        # ("models/demos/wormhole/qwen2_7b/demo/input_data_questions_prefill_128.json", True, 3),
+        # ("models/demos/wormhole/qwen2_7b/demo/input_data_questions_prefill_128.json", True, 4),
+        # ("models/demos/wormhole/qwen2_7b/demo/input_data_questions_prefill_128.json", True, 5),
     ],
     ids=[
         "general_weights-1_batch",
-        #        "general_weights-2_batch",
-        #        "general_weights-3_batch",
-        #        "general_weights-4_batch",
-        #        "general_weights-5_batch",
-        #        "instruct_weights-1_batch",
-        #        "instruct_weights-2_batch",
-        #        "instruct_weights-3_batch",
-        #        "instruct_weights-4_batch",
-        #        "instruct_weights-5_batch",
+        # FIXME(cthsieh): Will enable when ready.
+        # "general_weights-2_batch",
+        # "general_weights-3_batch",
+        # "general_weights-4_batch",
+        # "general_weights-5_batch",
+        # "instruct_weights-1_batch",
+        # "instruct_weights-2_batch",
+        # "instruct_weights-3_batch",
+        # "instruct_weights-4_batch",
+        # "instruct_weights-5_batch",
     ],
 )
 def test_qwen2_7B_demo(
@@ -615,7 +581,7 @@ def test_qwen2_7B_demo(
 
     return run_qwen2_demo(
         user_input=input_prompts,
-        batch_size=1,
+        batch_size=8,
         device=device,
         instruct_mode=instruct_weights,
         is_ci_env=is_ci_env,

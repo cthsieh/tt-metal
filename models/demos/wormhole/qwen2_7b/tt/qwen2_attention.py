@@ -110,9 +110,9 @@ class TtQwen2Attention(nn.Module):
                         torch.chunk(self.state_dict[bias_v_str], self.num_devices)[i],
                     ],
                     dim=-1,
-                ),
+                ).unsqueeze(0),
                 device=self.devices[i],
-                dtype=ttnn.bfloat16,
+                dtype=self.dtype,
                 memory_config=self.model_config["ATTN_BIAS_WEIGHTS_MEMCFG"],
                 layout=self.model_config["ATTN_B_LAYOUT_TILE"],
                 cache_file_name=cache_name("bias_qkv"),
@@ -300,7 +300,6 @@ class TtQwen2Attention(nn.Module):
             ###
             # QKV matmuls
             ###
-            # FIXME(cthsieh): Should have bias.
             xqkv_fused = ttnn.linear(
                 x,
                 wqkv,
@@ -411,6 +410,7 @@ class TtQwen2Attention(nn.Module):
                 attn_sliced = ttnn.softmax(
                     attn_sliced,
                     dim=-1,
+                    numeric_stable=True,
                 )
 
                 # Reshape such that true unpadded batch is tracked in shape

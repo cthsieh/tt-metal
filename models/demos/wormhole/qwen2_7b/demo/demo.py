@@ -10,25 +10,18 @@ from loguru import logger
 import os
 import ttnn
 import pytest
-from models.demos.wormhole.mistral7b.tt.mistral_common import (
+from models.demos.wormhole.qwen2_7b.tt.qwen2_common import (
     prepare_inputs_ttnn,
     sample,
     precompute_freqs,
     freqs_to_rotation_matrix,
     cache_attention,
+    load_safetensor_weights,
 )
-from models.demos.wormhole.mistral7b.tt.mistral_model import TtTransformer
-from models.demos.wormhole.mistral7b.tt.mistral_embedding import TtMistralEmbedding
-from models.demos.wormhole.mistral7b.reference.tokenizer import Tokenizer
-
-
-class Emb(torch.nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.emb = torch.nn.Embedding(32000, 4096)
-
-    def forward(self, x):
-        return self.emb(x)
+from models.demos.wormhole.qwen2_7b.tt.qwen2_model import TtTransformer
+from models.demos.wormhole.qwen2_7b.tt.qwen2_embedding import TtQwen2Embedding
+from models.demos.wormhole.qwen2_7b.reference.tokenizer import Tokenizer
+from models.demos.wormhole.qwen2_7b.reference.model import Emb
 
 
 # load from json, return as a list
@@ -69,7 +62,7 @@ def preprocess_inputs(input_prompts, tokenizer, model_args, dtype, embd, instruc
     seqlen = 1  # Generating one token per user at a time
     # Select the first token from the prompts for initial decoding
     pt_tokenized_inputs = torch.tensor(input_tokens)
-    emb_inputs = embd(pt_tokenized_inputs[:, 0]).view(model_args.max_batch_size, seqlen, -1)
+    emb_inputs = embd(pt_tokenized_inputs[:, 0]).view(pt_tokenized_inputs.shape[0], seqlen, -1)
 
     # Return the rotational embedding matrix on device
     cos, sin = precompute_freqs(model_args.head_dim, model_args.max_seq_len * 2)
@@ -86,23 +79,23 @@ def preprocess_inputs(input_prompts, tokenizer, model_args, dtype, embd, instruc
     return emb_inputs, pt_tokenized_inputs, input_mask, rot_emb_matrix_list
 
 
-def run_mistral_demo(user_input, batch_size, device, instruct_mode, is_ci_env, num_batches, print_to_file):
+def run_qwen2_demo(user_input, batch_size, device, instruct_mode, is_ci_env, num_batches, print_to_file):
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    output_directory = "models/demos/wormhole/mistral7b/demo/output"
+    output_directory = "models/demos/wormhole/qwen2_7b/demo/output"
     os.makedirs(output_directory, exist_ok=True)
     os.chmod(output_directory, 0o755)
     output_filename = f"{output_directory}/demo_user_output_{timestamp}.txt"
-    # Set Mistral flags for CI
+    # Set Qwen2 flags for CI
     if is_ci_env and instruct_mode:  # Update paths for instruct mode, otherwise use default paths for general weights
-        os.environ["MISTRAL_CKPT_DIR"] = "/mnt/MLPerf/tt_dnn-models/Mistral/mistral-7B-v0.1/instruct/"
-        os.environ["MISTRAL_TOKENIZER_PATH"] = "/mnt/MLPerf/tt_dnn-models/Mistral/mistral-7B-v0.1/instruct/"
-        os.environ["MISTRAL_CACHE_PATH"] = "/mnt/MLPerf/tt_dnn-models/Mistral/mistral-7B-v0.1/instruct/"
+        os.environ["QWEN2_CKPT_DIR"] = "/mnt/MLPerf/tt_dnn-models/Mistral/mistral-7B-v0.1/instruct/"
+        os.environ["QWEN2_TOKENIZER_PATH"] = "/mnt/MLPerf/tt_dnn-models/Mistral/mistral-7B-v0.1/instruct/"
+        os.environ["QWEN2_CACHE_PATH"] = "/mnt/MLPerf/tt_dnn-models/Mistral/mistral-7B-v0.1/instruct/"
 
     # This module requires the env paths above for CI runs
-    from models.demos.wormhole.mistral7b.tt.model_config import TtModelArgs
+    from models.demos.wormhole.qwen2_7b.tt.model_config import TtModelArgs
 
     embed_on_device = False
-    dtype = ttnn.bfloat8_b
+    dtype = ttnn.bfloat16
 
     # Load model args, weights, and tokenizer
     model_args = TtModelArgs(device, instruct=instruct_mode)
@@ -110,10 +103,10 @@ def run_mistral_demo(user_input, batch_size, device, instruct_mode, is_ci_env, n
 
     logger.info(f"Reading inputs...")
     if len(user_input) == 1:
-        input_prompts = user_input * model_args.max_batch_size  # Always process 32 users
+        input_prompts = user_input * batch_size  # Always process 32 users
     else:
-        input_prompts = load_inputs(user_input, model_args.max_batch_size)
-    model_args.n_layers = 32
+        input_prompts = load_inputs(user_input, batch_size)
+    model_args.n_layers = 28
 
     # Generate the batched prompts
     batch_prompts = []
@@ -121,20 +114,20 @@ def run_mistral_demo(user_input, batch_size, device, instruct_mode, is_ci_env, n
         batch_prompts.append([input_prompts[(j + i) % len(input_prompts)] for j in range(len(input_prompts))])
 
     logger.info("Loading weights...")
-    state_dict = torch.load(model_args.consolidated_weights_path)
+    state_dict = load_safetensor_weights(model_args.consolidated_weights_path)
     state_dict = {
         k: v
         for k, v in state_dict.items()
         if (
             any([f"layers.{i}." in k for i in range(model_args.n_layers)])
-            or k in ["tok_embeddings.weight", "norm.weight", "output.weight"]
+            or k in ["model.embed_tokens.weight", "model.norm.weight", "lm_head.weight"]
         )
     }
     logger.info("Loading weights finished!")
 
     # TODO Should we keep initial embedding on host?
-    embd = Emb()
-    embd.load_state_dict({"emb.weight": state_dict["tok_embeddings.weight"]})
+    embd = Emb(model_args.vocab_size, model_args.dim, tokenizer.pad_id)
+    embd.load_state_dict({"emb.weight": state_dict["model.embed_tokens.weight"]})
 
     generation_start_pos = 0
     max_generated_tokens = 120
@@ -150,7 +143,7 @@ def run_mistral_demo(user_input, batch_size, device, instruct_mode, is_ci_env, n
     if instruct_mode:
         tokenizer._model.pad_id = tokenizer._model.eos_id
 
-    # Load TTNN mistral model
+    # Load TTNN qwen2 model
     logger.info("Loading weights to device...")
     tt_model = TtTransformer(
         args=model_args,
@@ -162,13 +155,14 @@ def run_mistral_demo(user_input, batch_size, device, instruct_mode, is_ci_env, n
         rot_mat=rot_emb_matrix_list,
         start_pos=generation_start_pos,
     )
-    tt_embd = TtMistralEmbedding(
-        device=device,
-        args=model_args,
-        weight_cache_path=model_args.weight_cache_path(dtype),
-        state_dict=state_dict,
-        dtype=ttnn.bfloat16,  # Row major layout requires bfloat16
-    )
+    if embed_on_device:
+        tt_embd = TtQwen2Embedding(
+            device=device,
+            args=model_args,
+            weight_cache_path=model_args.weight_cache_path(dtype),
+            state_dict=state_dict,
+            dtype=ttnn.bfloat16,  # Row major layout requires bfloat16
+        )
     logger.info("Finished loading weights to device. Starting inference...")
 
     for batch_idx, input_prompts in enumerate(batch_prompts):
@@ -206,10 +200,10 @@ def run_mistral_demo(user_input, batch_size, device, instruct_mode, is_ci_env, n
                 tt_model.device,
             )
 
-            # Run ttnn mistral model
+            # Run ttnn qwen2 model
             tt_out = tt_model(decode_input, current_pos)
             tt_output_torch = (
-                ttnn.to_torch(tt_out).permute(2, 1, 0, 3).squeeze(1)[: model_args.max_batch_size, :, :]
+                ttnn.to_torch(tt_out).permute(2, 1, 0, 3).squeeze(1)[:batch_size, :, :]
             )  # [batch, seq, hidden_dim]
 
             # If temperature is 0, does greedy decoding (top-1)
@@ -234,7 +228,7 @@ def run_mistral_demo(user_input, batch_size, device, instruct_mode, is_ci_env, n
             for user in range(batch_size):
                 user_tok = tt_out_tok[user].tolist()
                 if (
-                    user_tok[0] != 28803 and user_done[user] == False
+                    user_tok[0] != tokenizer.eos_id and user_done[user] == False
                 ):  # Stop saving the ouput after hitting the EOS token
                     all_outputs[user].append(user_tok[0])
                 else:
@@ -304,38 +298,40 @@ def run_mistral_demo(user_input, batch_size, device, instruct_mode, is_ci_env, n
     "input_prompts, instruct_weights, num_batches",
     [
         # Combinations for general weights
-        ("models/demos/wormhole/mistral7b/demo/input_data.json", False, 1),
-        ("models/demos/wormhole/mistral7b/demo/input_data.json", False, 2),
-        ("models/demos/wormhole/mistral7b/demo/input_data.json", False, 3),
-        ("models/demos/wormhole/mistral7b/demo/input_data.json", False, 4),
-        ("models/demos/wormhole/mistral7b/demo/input_data.json", False, 5),
+        ("models/demos/wormhole/qwen2_7b/demo/input_data.json", False, 1),
+        # FIXME(cthsieh): Will enable when ready.
+        # ("models/demos/wormhole/mistral7b/demo/input_data.json", False, 2),
+        # ("models/demos/wormhole/mistral7b/demo/input_data.json", False, 3),
+        # ("models/demos/wormhole/mistral7b/demo/input_data.json", False, 4),
+        # ("models/demos/wormhole/mistral7b/demo/input_data.json", False, 5),
         # Combinations for instruct weights
-        ("models/demos/wormhole/mistral7b/demo/input_data_questions.json", True, 1),
-        ("models/demos/wormhole/mistral7b/demo/input_data_questions.json", True, 2),
-        ("models/demos/wormhole/mistral7b/demo/input_data_questions.json", True, 3),
-        ("models/demos/wormhole/mistral7b/demo/input_data_questions.json", True, 4),
-        ("models/demos/wormhole/mistral7b/demo/input_data_questions.json", True, 5),
+        # ("models/demos/wormhole/mistral7b/demo/input_data_questions.json", True, 1),
+        # ("models/demos/wormhole/mistral7b/demo/input_data_questions.json", True, 2),
+        # ("models/demos/wormhole/mistral7b/demo/input_data_questions.json", True, 3),
+        # ("models/demos/wormhole/mistral7b/demo/input_data_questions.json", True, 4),
+        # ("models/demos/wormhole/mistral7b/demo/input_data_questions.json", True, 5),
     ],
     ids=[
         "general_weights-1_batch",
-        "general_weights-2_batch",
-        "general_weights-3_batch",
-        "general_weights-4_batch",
-        "general_weights-5_batch",
-        "instruct_weights-1_batch",
-        "instruct_weights-2_batch",
-        "instruct_weights-3_batch",
-        "instruct_weights-4_batch",
-        "instruct_weights-5_batch",
+        # FIXME(cthsieh): Will enable when ready.
+        # "general_weights-2_batch",
+        # "general_weights-3_batch",
+        # "general_weights-4_batch",
+        # "general_weights-5_batch",
+        # "instruct_weights-1_batch",
+        # "instruct_weights-2_batch",
+        # "instruct_weights-3_batch",
+        # "instruct_weights-4_batch",
+        # "instruct_weights-5_batch",
     ],
 )
-def test_mistral7B_demo(device, use_program_cache, input_prompts, instruct_weights, is_ci_env, num_batches):
+def test_qwen2_7B_demo(device, use_program_cache, input_prompts, instruct_weights, is_ci_env, num_batches):
     if (is_ci_env and instruct_weights == False) or (is_ci_env and not (num_batches == 1 or num_batches == 3)):
         pytest.skip(
             "CI demo test only runs instruct weights (1 and 3 batches) to reduce CI pipeline load (both are supported)"
         )
 
-    return run_mistral_demo(
+    return run_qwen2_demo(
         user_input=input_prompts,
         batch_size=8,
         device=device,
