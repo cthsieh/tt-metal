@@ -28,13 +28,13 @@ from models.utility_functions import skip_for_grayskull
 @pytest.mark.models_performance_bare_metal
 @pytest.mark.parametrize(
     "iterations",
-    (3,),
+    (8,),
 )
 def test_qwen2_model_inference(device, iterations, use_program_cache, reset_seeds):
     run_ref_pt = True  # Flag to run reference PyTorch model and compare PCC
     cache_pcc = False  # Flag to measure KV cache PCC for all layers
 
-    dtype = ttnn.bfloat16
+    dtype = ttnn.bfloat8_b
     pcc = 0.97
 
     model_args = TtModelArgs(device)
@@ -143,14 +143,14 @@ def test_qwen2_model_inference(device, iterations, use_program_cache, reset_seed
             ref_output = reference_model(pt_decode_input, freqs_cis_i, positions)
 
         # While in "prefill" mode, use the prompt tokens as the output
-        if i in range(len(encoded_prompts[0])):
+        if i in range(len(encoded_prompts[0]) - 1):
             all_outputs.append(encoded_prompts[0][i])  # Update list of TT outputs
             if run_ref_pt:
                 all_outputs_ref.append(encoded_prompts[0][i])  # Update list of ref outputs
 
-            tt_decode_input = embd(encoded_prompts_tensor[:, i]).view(batch, seqlen, -1)
+            tt_decode_input = embd(encoded_prompts_tensor[:, i + 1]).view(batch, seqlen, -1)
             if run_ref_pt:
-                pt_decode_input = embd(encoded_prompts_tensor[:, i]).view(batch, seqlen, -1)
+                pt_decode_input = embd(encoded_prompts_tensor[:, i + 1]).view(batch, seqlen, -1)
         else:
             # Greedy decode (temperature = 0) the generated token and save it to print out later
             tt_out_tok = sample(tt_output_torch, temperature=0, top_p=0.8)

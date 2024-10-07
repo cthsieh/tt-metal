@@ -95,7 +95,7 @@ def run_qwen2_demo(user_input, batch_size, device, instruct_mode, is_ci_env, num
     from models.demos.wormhole.qwen2_7b.tt.model_config import TtModelArgs
 
     embed_on_device = False
-    dtype = ttnn.bfloat16
+    dtype = ttnn.bfloat8_b
 
     # Load model args, weights, and tokenizer
     model_args = TtModelArgs(device, instruct=instruct_mode)
@@ -130,7 +130,7 @@ def run_qwen2_demo(user_input, batch_size, device, instruct_mode, is_ci_env, num
     embd.load_state_dict({"emb.weight": state_dict["model.embed_tokens.weight"]})
 
     generation_start_pos = 0
-    max_generated_tokens = 120
+    max_generated_tokens = 200
     users_decoding = True
 
     # generate rot_emb_matrix_list
