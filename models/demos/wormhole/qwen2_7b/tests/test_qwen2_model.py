@@ -39,7 +39,7 @@ def test_qwen2_model_inference(device, iterations, use_program_cache, reset_seed
 
     model_args = TtModelArgs(device)
 
-    model_args.n_layers = 1  # Full model is 28
+    model_args.n_layers = 28  # Full model is 28
 
     tokenizer = Tokenizer(model_args.tokenizer_path)
 
@@ -150,7 +150,8 @@ def test_qwen2_model_inference(device, iterations, use_program_cache, reset_seed
 
             tt_decode_input = embd(encoded_prompts_tensor[:, i + 1]).view(batch, seqlen, -1)
             if run_ref_pt:
-                pt_decode_input = embd(encoded_prompts_tensor[:, i + 1]).view(batch, seqlen, -1)
+                # pt_decode_input = embd(encoded_prompts_tensor[:, i + 1]).view(batch, seqlen, -1)
+                pt_decode_input = tt_decode_input
         else:
             # Greedy decode (temperature = 0) the generated token and save it to print out later
             tt_out_tok = sample(tt_output_torch, temperature=0, top_p=0.8)
@@ -159,6 +160,10 @@ def test_qwen2_model_inference(device, iterations, use_program_cache, reset_seed
             if run_ref_pt:
                 pt_out_tok = sample(ref_output, temperature=0, top_p=0.8)
                 pt_decode_input = embd(pt_out_tok)
+                # FIXME(cthsieh): Alternative approach.
+                # pt_out_tok = tt_out_tok
+                # pt_decode_input = tt_decode_input
+
                 all_outputs_ref.append(
                     pt_out_tok.squeeze(1).tolist()[0]
                 )  # Update generated token to list of ref outputs
