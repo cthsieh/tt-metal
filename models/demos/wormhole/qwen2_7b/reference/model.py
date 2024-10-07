@@ -71,11 +71,16 @@ def apply_rotary_emb(
     xk: torch.Tensor,
     freqs_cis: torch.Tensor,
 ) -> Tuple[torch.Tensor, torch.Tensor]:
-    xq_ = torch.view_as_complex(xq.float().reshape(*xq.shape[:-1], -1, 2))
-    xk_ = torch.view_as_complex(xk.float().reshape(*xk.shape[:-1], -1, 2))
+    """
+    The algorithm sources from Qwen2 codes in the Transformer library: https://github.com/huggingface/transformers/blob/1bd604d11c405dfb8b78bda4062d88fc75c17de0/src/transformers/models/qwen2/modeling_qwen2.py#L182.
+    """
+    xq_ = torch.complex(xq.float()[..., : xq.shape[-1] // 2], xq.float()[..., xq.shape[-1] // 2 :])
+    xk_ = torch.complex(xk.float()[..., : xk.shape[-1] // 2], xk.float()[..., xk.shape[-1] // 2 :])
     freqs_cis = _reshape_for_broadcast(freqs_cis, xq_)
-    xq_out = torch.view_as_real(xq_ * freqs_cis).flatten(3)
-    xk_out = torch.view_as_real(xk_ * freqs_cis).flatten(3)
+    xq_ = xq_ * freqs_cis
+    xk_ = xk_ * freqs_cis
+    xq_out = torch.cat((torch.real(xq_), torch.imag(xq_)), dim=-1)
+    xk_out = torch.cat((torch.real(xk_), torch.imag(xk_)), dim=-1)
     return xq_out.type_as(xq), xk_out.type_as(xk)
 
 
@@ -126,7 +131,6 @@ class Attention(nn.Module):
         self, x: torch.Tensor, freqs_cis: torch.Tensor, positions: torch.Tensor, mask: Optional[torch.Tensor]
     ) -> torch.Tensor:
         x = x.to(torch.bfloat16)
-        freqs_cis = freqs_cis.to(torch.bfloat16)
 
         bsz, seqlen, _ = x.shape
         xq, xk, xv = self.q_proj(x), self.k_proj(x), self.v_proj(x)
@@ -134,7 +138,6 @@ class Attention(nn.Module):
         xk = xk.view(bsz, seqlen, self.n_kv_heads, self.args.head_dim)
         xv = xv.view(bsz, seqlen, self.n_kv_heads, self.args.head_dim)
         xq, xk = apply_rotary_emb(xq, xk, freqs_cis=freqs_cis)
-
         # The cache is a rotating buffer
         scatter_pos = (positions[-self.sliding_window :] % self.sliding_window)[None, :, None, None]
         scatter_pos = scatter_pos.repeat(bsz, 1, self.n_kv_heads, self.args.head_dim)
@@ -220,20 +223,12 @@ class TransformerBlock(nn.Module):
         self, x: torch.Tensor, freqs_cis: torch.Tensor, positions: torch.Tensor, mask: Optional[torch.Tensor]
     ) -> torch.Tensor:
         x = x.to(torch.bfloat16)
-        freqs_cis = freqs_cis.to(torch.bfloat16)
 
         r = self.self_attn.forward(self.input_layernorm(x), freqs_cis, positions, mask)
         h = x + r
         r = self.mlp.forward(self.post_attention_layernorm(h))
         out = h + r
         return out
-
-
-def precompute_freqs_cis(dim: int, end: int, theta: float = 10000.0) -> torch.Tensor:
-    freqs = 1.0 / (theta ** (torch.arange(0, dim, 2)[: (dim // 2)].float() / dim))
-    t = torch.arange(end, device=freqs.device)  # type: ignore
-    freqs = torch.outer(t, freqs).float()  # type: ignore
-    return torch.polar(torch.ones_like(freqs), freqs)  # complex64
 
 
 class Transformer(nn.Module):
@@ -256,7 +251,7 @@ class Transformer(nn.Module):
 
     def forward(self, input_ids: torch.Tensor, freqs_cis_i, positions: torch.Tensor, mode="decode"):
         h = input_ids.to(torch.bfloat16)  # self.tok_embeddings(input_ids)
-        freqs_cis = freqs_cis_i.to(torch.bfloat16)  # [positions]
+        freqs_cis = freqs_cis_i  # [positions]
 
         mask: Optional[torch.Tensor] = None
         if input_ids.shape[1] > 1:

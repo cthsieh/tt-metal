@@ -81,13 +81,31 @@ def freqs_to_rotation_matrix(cos_freqs, sin_freqs):
     """
     emb_size, emb_dim = cos_freqs.shape
     dhead = emb_dim * 2
-    rot_emb_matrix = torch.zeros(emb_size, dhead, dhead)
-    rot_emb_matrix[..., torch.arange(0, dhead, 2), torch.arange(0, dhead, 2)] = cos_freqs.clone()
-    rot_emb_matrix[..., torch.arange(1, dhead, 2), torch.arange(1, dhead, 2)] = cos_freqs.clone()
-    rot_emb_matrix[..., torch.arange(0, dhead, 2), torch.arange(1, dhead, 2)] = -sin_freqs.clone()
-    rot_emb_matrix[..., torch.arange(1, dhead, 2), torch.arange(0, dhead, 2)] = sin_freqs.clone()
 
-    rot_emb_matrix = rot_emb_matrix.transpose(-1, -2)  # Necessary for correct rotation when applied as (x @ R)
+    """
+    The cosine and sine frequency values are arranged into the rotating matrix `rot_emb_matrix` as follows.
+    The arrangment sources from Qwen2 codes in the Transformer library: https://github.com/huggingface/transformers/blob/1bd604d11c405dfb8b78bda4062d88fc75c17de0/src/transformers/models/qwen2/modeling_qwen2.py#L182.
+    For Qwen2-7B, the head dimension `dhead` is 128, whereas 64 cosine and 64 sine frequency values are needed. Let's shorten `cos_freqs` as `cos` and `sin_freqs` as `sin`. The rotating matrix looks as
+
+    cos[0]     0      0       0  sin[0]     0      0       0
+        0  cos[1]                       sin[1]
+        0         ......
+        0                cos[63]                      sin[63]
+    -sin[0]                      cos[0]
+        0  -sin[1]                      cos[1]
+        0         ......                       ......
+        0                -sin[63]                     cos[63]
+
+    , which is a 128x128 matrix.
+
+    For a head vector of length 128, it should be viewed as 64 distinct 2D vectors, with each 2D vector to be rotated by a unique designated frequency. Assume the head vector is named `head`. Then, (head[0], head[64]) forms the first 2D vector, (head[1], head[65]) forms the second, and so on. All 2D vectors are rotated simultaneously using the above rotation matrix. As a result, the output vector `output` will have its first 2D vector rotated to (output[0], output[64]) = (head[0] * cos[0] - head[64] * sin[0], head[0] * sin[0] + head[64] * cos[0]).
+    """
+    rot_emb_matrix = torch.zeros(emb_size, dhead, dhead)
+    rot_emb_matrix[..., torch.arange(0, emb_dim), torch.arange(0, emb_dim)] = cos_freqs.clone()
+    rot_emb_matrix[..., torch.arange(emb_dim, dhead), torch.arange(emb_dim, dhead)] = cos_freqs.clone()
+    rot_emb_matrix[..., torch.arange(emb_dim, dhead), torch.arange(0, emb_dim)] = -sin_freqs.clone()
+    rot_emb_matrix[..., torch.arange(0, emb_dim), torch.arange(emb_dim, dhead)] = sin_freqs.clone()
+
     return rot_emb_matrix
 
 
