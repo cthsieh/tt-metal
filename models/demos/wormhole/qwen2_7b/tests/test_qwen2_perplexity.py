@@ -33,9 +33,7 @@ from models.datasets.llm_dataset_utils import (
 )
 
 
-def calculate_perplexity(
-    compute_logits_fn: Callable, dataloader, vocab_size
-) -> Tuple[float, float, float, float]:
+def calculate_perplexity(compute_logits_fn: Callable, dataloader, vocab_size) -> Tuple[float, float, float, float]:
     running_nll, running_top1_acc, running_top5_acc = 0.0, 0.0, 0.0
     with torch.no_grad():
         for input_ids, labels in tqdm(dataloader, desc="Evaluating batches"):
@@ -55,14 +53,14 @@ def calculate_perplexity(
     return float(nll), float(ppl), float(top1_acc), float(top5_acc)
 
 
-def test_qwen2_reference_perplexity(
-    batch_size: int,
-    max_seq_len: int,
-    num_samples: int,
-    expected_ppl: int,
-    expected_top1: int,
-    expected_top5: int
-):
+@pytest.mark.parametrize(
+    "batch_size, max_seq_len, num_samples",
+    [
+        # Combinations for general weights
+        (8, 64, 64)
+    ],
+)
+def test_qwen2_reference_perplexity(batch_size: int, max_seq_len: int, num_samples: int):
     torch.manual_seed(0)
 
     logger.info("Preparing dataset")
@@ -116,9 +114,7 @@ def test_qwen2_reference_perplexity(
 
     logger.info(f"Evaluating perplexity (batch_size={batch_size} max_seq_len={max_seq_len} num_samples={num_samples})")
     start = time.time()
-    nll, ppl, top1_acc, top5_acc = calculate_perplexity(
-        compute_logits, dataloader, reference_model.args.vocab_size
-    )
+    nll, ppl, top1_acc, top5_acc = calculate_perplexity(compute_logits, dataloader, reference_model.args.vocab_size)
     end = time.time()
 
     logger.info(f"Perplexity evaluation time: {(end - start):.2f} s")
@@ -127,20 +123,15 @@ def test_qwen2_reference_perplexity(
     logger.info(f"Top-1 accuracy: {top1_acc:.4f}")
     logger.info(f"Top-5 accuracy: {top5_acc:.4f}")
 
-    # calculated_acc_metrics = {"ppl": ppl, "top1_acc": top1_acc, "top5_acc": top5_acc}
-    # expected_acc_metrics = {"ppl": expected_ppl, "top1_acc": expected_top1, "top5_acc": expected_top5}
-    # verify_acc_metrics(calculated_acc_metrics, expected_acc_metrics)
 
-
-def test_qwen2_perplexity(
-    device: str,
-    batch_size: int,
-    max_seq_len: int,
-    num_samples: int,
-    expected_ppl: int,
-    expected_top1: int,
-    expected_top5: int
-):
+@pytest.mark.parametrize(
+    "batch_size, max_seq_len, num_samples",
+    [
+        # Combinations for general weights
+        (8, 64, 64)
+    ],
+)
+def test_qwen2_perplexity(device: str, batch_size: int, max_seq_len: int, num_samples: int):
     torch.manual_seed(0)
 
     logger.info("Preparing dataset")
@@ -181,7 +172,7 @@ def test_qwen2_perplexity(
             ttnn.from_torch(
                 rot_emb_matrix[i, :, :].unsqueeze(0).unsqueeze(0), device=device, dtype=dtype, layout=ttnn.TILE_LAYOUT
             )
-        ) # ttnn.bfloat16
+        )  # ttnn.bfloat16
 
     tt_model = TtTransformer(
         args=model_args,
@@ -209,7 +200,11 @@ def test_qwen2_perplexity(
                 tt_model.device,
             )
 
-            next_token_logits = tt_model(decode_input, current_pos)
+            tt_out_logits = tt_model(decode_input, current_pos)
+
+            # [batch, seq, hidden_dim]
+            torch_out = ttnn.to_torch(tt_out_logits)
+            next_token_logits = torch_out.permute(2, 1, 0, 3).squeeze(1)[:batch_size, :, :]
             logits.append(next_token_logits)
         return torch.cat(logits, dim=1)
 
@@ -217,9 +212,7 @@ def test_qwen2_perplexity(
 
     logger.info(f"Evaluating perplexity (batch_size={batch_size} max_seq_len={max_seq_len} num_samples={num_samples})")
     start = time.time()
-    nll, ppl, top1_acc, top5_acc = calculate_perplexity(
-        compute_logits, dataloader, model_args.args.vocab_size
-    )
+    nll, ppl, top1_acc, top5_acc = calculate_perplexity(compute_logits, dataloader, model_args.vocab_size)
     end = time.time()
 
     logger.info(f"Perplexity evaluation time: {(end - start):.2f} s")
@@ -227,10 +220,3 @@ def test_qwen2_perplexity(
     logger.info(f"Perplexity: {ppl:.4f}")
     logger.info(f"Top-1 accuracy: {top1_acc:.4f}")
     logger.info(f"Top-5 accuracy: {top5_acc:.4f}")
-
-    # calculated_acc_metrics = {"ppl": ppl, "top1_acc": top1_acc, "top5_acc": top5_acc}
-    # expected_acc_metrics = {"ppl": expected_ppl, "top1_acc": expected_top1, "top5_acc": expected_top5}
-    # verify_acc_metrics(calculated_acc_metrics, expected_acc_metrics)
-
-
-test_qwen2_reference_perplexity(8, 64, 64, 21.6, 0.39, 0.65)

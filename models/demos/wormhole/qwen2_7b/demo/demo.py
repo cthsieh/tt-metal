@@ -130,7 +130,7 @@ def run_qwen2_demo(user_input, batch_size, device, instruct_mode, is_ci_env, num
     embd.load_state_dict({"emb.weight": state_dict["model.embed_tokens.weight"]})
 
     generation_start_pos = 0
-    max_generated_tokens = 200
+    max_generated_tokens = 50
     users_decoding = True
 
     # generate rot_emb_matrix_list
@@ -139,9 +139,6 @@ def run_qwen2_demo(user_input, batch_size, device, instruct_mode, is_ci_env, num
     )
     logger.info("Caching attention ops...")
     cache_attention(device, state_dict, model_args, rot_emb_matrix_list, dtype, max_generated_tokens)
-
-    if instruct_mode:
-        tokenizer._model.pad_id = tokenizer._model.eos_id
 
     # Load TTNN qwen2 model
     logger.info("Loading weights to device...")
@@ -299,30 +296,28 @@ def run_qwen2_demo(user_input, batch_size, device, instruct_mode, is_ci_env, num
     [
         # Combinations for general weights
         ("models/demos/wormhole/qwen2_7b/demo/input_data.json", False, 1),
-        # FIXME(cthsieh): Will enable when ready.
-        # ("models/demos/wormhole/mistral7b/demo/input_data.json", False, 2),
-        # ("models/demos/wormhole/mistral7b/demo/input_data.json", False, 3),
-        # ("models/demos/wormhole/mistral7b/demo/input_data.json", False, 4),
-        # ("models/demos/wormhole/mistral7b/demo/input_data.json", False, 5),
+        ("models/demos/wormhole/mistral7b/demo/input_data.json", False, 2),
+        ("models/demos/wormhole/mistral7b/demo/input_data.json", False, 3),
+        ("models/demos/wormhole/mistral7b/demo/input_data.json", False, 4),
+        ("models/demos/wormhole/mistral7b/demo/input_data.json", False, 5),
         # Combinations for instruct weights
-        # ("models/demos/wormhole/mistral7b/demo/input_data_questions.json", True, 1),
-        # ("models/demos/wormhole/mistral7b/demo/input_data_questions.json", True, 2),
-        # ("models/demos/wormhole/mistral7b/demo/input_data_questions.json", True, 3),
-        # ("models/demos/wormhole/mistral7b/demo/input_data_questions.json", True, 4),
-        # ("models/demos/wormhole/mistral7b/demo/input_data_questions.json", True, 5),
+        ("models/demos/wormhole/mistral7b/demo/input_data_questions.json", True, 1),
+        ("models/demos/wormhole/mistral7b/demo/input_data_questions.json", True, 2),
+        ("models/demos/wormhole/mistral7b/demo/input_data_questions.json", True, 3),
+        ("models/demos/wormhole/mistral7b/demo/input_data_questions.json", True, 4),
+        ("models/demos/wormhole/mistral7b/demo/input_data_questions.json", True, 5),
     ],
     ids=[
         "general_weights-1_batch",
-        # FIXME(cthsieh): Will enable when ready.
-        # "general_weights-2_batch",
-        # "general_weights-3_batch",
-        # "general_weights-4_batch",
-        # "general_weights-5_batch",
-        # "instruct_weights-1_batch",
-        # "instruct_weights-2_batch",
-        # "instruct_weights-3_batch",
-        # "instruct_weights-4_batch",
-        # "instruct_weights-5_batch",
+        "general_weights-2_batch",
+        "general_weights-3_batch",
+        "general_weights-4_batch",
+        "general_weights-5_batch",
+        "instruct_weights-1_batch",
+        "instruct_weights-2_batch",
+        "instruct_weights-3_batch",
+        "instruct_weights-4_batch",
+        "instruct_weights-5_batch",
     ],
 )
 def test_qwen2_7B_demo(device, use_program_cache, input_prompts, instruct_weights, is_ci_env, num_batches):

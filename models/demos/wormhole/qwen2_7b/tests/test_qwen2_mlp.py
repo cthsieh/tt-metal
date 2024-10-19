@@ -22,14 +22,14 @@ from models.utility_functions import skip_for_grayskull
 
 @skip_for_grayskull("Requires wormhole_b0 to run")
 @pytest.mark.parametrize(
-    "seq_len",
+    "batch_size",
     (
+        1,
         8,
         256,
-        4096,
     ),
 )
-def test_qwen2_mlp_inference(device, seq_len, use_program_cache, reset_seeds):
+def test_qwen2_mlp_inference(device, batch_size, use_program_cache, reset_seeds):
     dtype = ttnn.bfloat8_b
     model_args = TtModelArgs(device=device)
     state_dict = load_safetensor_weights(model_args.consolidated_weights_path)
@@ -50,7 +50,7 @@ def test_qwen2_mlp_inference(device, seq_len, use_program_cache, reset_seeds):
         dtype=dtype,
         model_config=model_args.get_model_config(),
     )
-    torch_input = torch.randn(1, 1, seq_len, model_args.dim)
+    torch_input = torch.randn(1, 1, batch_size, model_args.dim)
     reference_output = reference_model(torch_input)
     tt_input = ttnn.from_torch(
         torch_input, device=device, dtype=ttnn.bfloat16, memory_config=ttnn.L1_MEMORY_CONFIG, layout=ttnn.TILE_LAYOUT

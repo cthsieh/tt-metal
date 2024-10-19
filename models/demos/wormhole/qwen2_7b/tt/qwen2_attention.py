@@ -490,7 +490,7 @@ class TtQwen2Attention(nn.Module):
 
                 # scores softmax
                 attn_1BQP_presoftmax = attn_1BQP[:, :, :, :layer_slice]
-                attn_1BQP = ttnn.softmax(attn_1BQP_presoftmax, dim=-1)
+                attn_1BQP = ttnn.softmax(attn_1BQP_presoftmax, dim=-1, numeric_stable=True)
                 attn_1BQP = ttnn.pad(attn_1BQP, ((0, 0), (0, 0), (0, 0), (0, 0)), value=0.0)
 
                 # attention matmul
