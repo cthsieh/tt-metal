@@ -94,7 +94,7 @@ If you wish you to run the model using a different set of input prompts you can 
 
 ## Known Issues
 
-1. Variation in the PCC scores.
+### 1. Variation in the PCC scores.
 
 PCC (Pearson Correlation Coefficient) is used to measure the inference differences between the TT model and the reference model.
 
@@ -122,13 +122,13 @@ The PCC scores for the first 10 tokens are as follows.
 | 8 | 0.9695236893895862 |
 | 9 | 0.9545147233692451 |
 
-2. Sequence length limitation and incomplete RoPE implementation due to hardware constraints.
+### 2. Sequence length limitation and incomplete RoPE implementation due to hardware constraints.
 
 The Qwen2 model was intended to support sequences up to a maximum length of 131,072 tokens, but the current implementation can only process up to 4,096 tokens.
 
 Since the Qwen2 model is designed to handle very long sequences, a specialized RoPE approach is required for such extreme cases. However, this method only takes effect when the sequence length exceeds a certain threshold. In our implementation, the current limit of 4096 tokens is well below that threshold, making the specialized RoPE implementation unnecessary for now. We plan to incorporate this feature in future development once the hardware constraints are resolved, allowing support for larger sequence lengths.
 
-3. Further analysis of the PPL results.
+### 3. Further analysis of the PPL results.
 
 We have conducted a PPL (perplexity) evaluation experiment to assess the performance of our model. However, the results of this experiment require further analysis, and their full significance is not yet clear.
 
